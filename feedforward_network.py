@@ -1,5 +1,7 @@
 # coding: utf-8
 
+import sys
+import json
 import numpy as np
 import random
 import matplotlib.pyplot as plt
@@ -184,6 +186,27 @@ class Network(object):
     def cost_derivative(self, output_activation, y):
         return output_activation - y
 
+    # 保存模型
+    def save(self, filename):
+        data = {"sizes" : self.sizes,
+                "weights" : [w.tolist() for w in self.weights]
+                "biases" : [w.tolist() for b in self.biases]
+                "cost" : str(self.cost.__name__)
+        }
+        with open(filename, 'w') as f:
+            json.dump(data, f)
+
+
+# 加载模型
+def load(filename):
+    with open(filename, 'r') as f:
+        data = json.load(f)
+    cost = getattr(sys.modules[__name__], data["cost"])
+    ney = Network(data["sizes"], cost=cost)
+    net.weights = [np.array(w) for w in data["weights"]]
+    net.biases = [np.array(b) for b in data["biases"]]
+
+    return net
 
 # sigmoid 激励函数
 def sigmoid(z):
