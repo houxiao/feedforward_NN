@@ -2,23 +2,48 @@
 
 import numpy as np
 import random
+import matplotlib.pyplot as plt
 
 import mnist_load
+
+trained_res = []
+
+class QuadraticCost(object):
+    @staticmethod
+    def fn(a, y):
+        return 0.5 * np.linalg.norm(a-y)**2
+
+    @staticmethod
+    def delta(z, a, y):
+        return (a-y) * sigmoid_prime(z)
+
+
+class CrossEntropyCost(object):
+    @staticmethod
+    def fn(a, y):
+        # 可能存在nan和inf值 需要转化为0和有限数
+        return np.sum(np.nan_to_num(-y * np.log(a) - (1-y) * np.log(1-a)))
+
+    @staticmethod
+    def delta(z, a, y):
+        return (a-y)
 
 
 # 定义神经网络结构
 class Network(object):
-    def __init__(self, sizes):
+    def __init__(self, sizes, cost=CrossEntropyCost):
         '''
         sizes (list): [input_layer_num, hidden_layer_num, output_layer_num]
         '''
-
         # 网络层数
         self.num_layers = len(sizes)
         # 每层神经元个数
         self.sizes = sizes
         # 初始化每层权重和偏置
         self.default_weight_initializer()
+        # 损失函数
+        self.cost = cost
+
 
     def default_weight_initializer(self):
         self.biases = [np.random.randn(y, 1) for y in self.sizes[1:]]
@@ -59,7 +84,7 @@ class Network(object):
     #         self.biases = [b - eta * nb for b, nb in zip(self.biases, nabla_b)]
     #         print("Epoch {0} complete".format(j))
 
-    def SGD(self, training_data, epochs,mini_batch_size, eta, test_data=None):
+    def SGD(self, training_data, epochs,mini_batch_size, eta, lmbda=0.0, test_data=None):
 
         if test_data:
             n_test = len(test_data)
@@ -76,14 +101,14 @@ class Network(object):
 
             # 训练mini_batch
             for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, eta)
+                self.update_mini_batch(mini_batch, eta, lmbda, n)
 
             if test_data:
                 print("Epoch {0}: {1} / {2}".format(j, self.evaluate(test_data), n_test))
 
             print("Epoch {0} complete".format(j))
 
-    def update_mini_batch(self, mini_batch, eta):
+    def update_mini_batch(self, mini_batch, eta, lmbda, n):
         # 保存每一层的偏导
             nabla_b = [np.zeros(b.shape) for b in self.biases]
             nabla_w = [np.zeros(w.shape) for w in self.weights]
@@ -96,8 +121,8 @@ class Network(object):
                 nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
                 nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
 
-            # 更新权重和偏置 Wn+1 = Wn - eta * nw
-            self.weights = [w - eta/len(mini_batch) * nw for w, nw in zip(self.weights, nabla_w)]
+            # 更新权重和偏置 Wn+1 = Wn - eta * nw w: 添加正则化项 -eta*(lmbda/n)*w 
+            self.weights = [(1 - eta*(lmbda/n)) * w - eta/len(mini_batch) * nw for w, nw in zip(self.weights, nabla_w)]
             self.biases = [b - eta/len(mini_batch) * nb for b, nb in zip(self.biases, nabla_b)]   
 
     # 前向传播
@@ -124,7 +149,10 @@ class Network(object):
 
         # 反向更新
         # 计算最后一层误差
-        delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1])
+
+        # delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1])
+        delta = self.cost.delta(za[-1], activations[-1], y) # 交叉熵
+
 
         # 最后一层权重和偏置的导数
         nabla_b[-1] = delta
@@ -146,6 +174,9 @@ class Network(object):
 
     def evaluate(self, test_data):
         tets_results = [(np.argmax(self.feedforward(x)), y) for (x, y) in test_data]
+
+        global trained_res
+        trained_res.append(sum((int(x==y)) for (x, y) in tets_results))
 
         return sum((int(x==y)) for (x, y) in tets_results)
 
@@ -169,4 +200,6 @@ def train_net():
 
 if __name__ == '__main__':
     train_net()
+    plt.plot(list(range(60)), trained_res)
+    plt.show()
 
