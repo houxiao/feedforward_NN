@@ -3,6 +3,9 @@
 import numpy as np
 import random
 
+import mnist_load
+
+
 # 定义神经网络结构
 class Network(object):
     def __init__(self, sizes):
@@ -14,10 +17,18 @@ class Network(object):
         self.num_layers = len(sizes)
         # 每层神经元个数
         self.sizes = sizes
+        # 初始化每层权重和偏置
+        self.default_weight_initializer()
+
+    def default_weight_initializer(self):
+        self.biases = [np.random.randn(y, 1) for y in self.sizes[1:]]
+        self.weights = [np.random.randn(y, x)/np.sqrt(x) for x, y in zip(self.sizes[:-1], self.sizes[1:])]
+        
+    def large_weight_initializer(self):
         # 初始化每层的偏置
-        self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
+        self.biases = [np.random.randn(y, 1) for y in self.sizes[1:]]
         # 初始化每层的权重
-        self.weights = [np.random.randn(y, x) for x, y in zip(sizes[:-1], sizes[1:])]
+        self.weights = [np.random.randn(y, x) for x, y in zip(self.sizes[:-1], self.sizes[1:])]
 
 
     def feedforward(self, a):
@@ -87,10 +98,7 @@ class Network(object):
 
             # 更新权重和偏置 Wn+1 = Wn - eta * nw
             self.weights = [w - eta/len(mini_batch) * nw for w, nw in zip(self.weights, nabla_w)]
-            self.biases = [b - eta/len(mini_batch) * nb for b, nb in zip(self.biases, nabla_b)]
-            
-
-
+            self.biases = [b - eta/len(mini_batch) * nb for b, nb in zip(self.biases, nabla_b)]   
 
     # 前向传播
     def update(self, x, y):
@@ -153,15 +161,12 @@ def sigmoid(z):
 def sigmoid_prime(z):
     return sigmoid(z) * (1 - sigmoid(z))
 
-if __name__ == '__main__':
-    import mnist_load
 
+def train_net():
     training_data, validation_data, test_data = mnist_load.load_data_wrapper()
-
-
     net = Network([28*28, 30, 10])
-    net.SGD(training_data, 30, 10, 0.5, test_data=test_data)
+    net.SGD(training_data, 60, 10, 0.5, test_data=test_data)
 
-
-
+if __name__ == '__main__':
+    train_net()
 
