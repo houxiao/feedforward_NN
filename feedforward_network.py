@@ -105,10 +105,20 @@ class Network(object):
             for mini_batch in mini_batches:
                 self.update_mini_batch(mini_batch, eta, lmbda, n)
 
-            if test_data:
-                print("Epoch {0}: {1} / {2}".format(j, self.evaluate(test_data), n_test))
-
             print("Epoch {0} complete".format(j))
+
+            cost = self.total_cost(training_data, lmbda)
+            print("Cost on training data: {}".format(cost))
+            accuracy = self.accuracy(training_data, convert=True)
+            print("Accuracy on training data: {} / {}".format(accuracy, n))
+
+            if test_data:
+                cost = self.total_cost(test_data, lmbda, convert=True)
+                print("Cost on test data: {}".format(cost))
+                accuracy = self.accuracy(test_data)
+                print("Accuracy on test data: {} / {}".format(accuracy, n_test))
+
+                # print("Epoch {0}: {1} / {2}".format(j, self.evaluate(test_data), n_test))
 
     def update_mini_batch(self, mini_batch, eta, lmbda, n):
         # 保存每一层的偏导
@@ -153,7 +163,7 @@ class Network(object):
         # 计算最后一层误差
 
         # delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1])
-        delta = self.cost.delta(za[-1], activations[-1], y) # 交叉熵
+        delta = self.cost.delta(zs[-1], activations[-1], y) # 交叉熵
 
 
         # 最后一层权重和偏置的导数
@@ -174,14 +184,26 @@ class Network(object):
 
         return (nabla_b, nabla_w)
 
-    def evaluate(self, test_data):
-        tets_results = [(np.argmax(self.feedforward(x)), y) for (x, y) in test_data]
+    def accuracy(self, data, convert=False):
+        if convert:
+            results = [(np.argmax(self.feedforward(x)), np.argmax(y)) for (x, y) in data]
+        else:
+            results = [(np.argmax(self.feedforward(x)), y) for (x, y) in data]
+            
+            global trained_res
+            trained_res.append(sum((int(x==y)) for (x, y) in results))
 
-        global trained_res
-        trained_res.append(sum((int(x==y)) for (x, y) in tets_results))
+        return sum((int(x==y)) for (x, y) in results)
 
-        return sum((int(x==y)) for (x, y) in tets_results)
-
+    def total_cost(self, data, lmbda, convert=False):
+        cost = 0.0
+        for x, y in data:
+            a = self.feedforward(x)
+            if convert:
+                y = vectorized_result(y)
+            cost += self.cost.fn(a, y) / len(data)
+        cost += 0.5 * lmbda/len(data)*sum(np.linalg.norm(w)**2 for w in self.weights)
+        return cost
 
     def cost_derivative(self, output_activation, y):
         return output_activation - y
@@ -189,8 +211,8 @@ class Network(object):
     # 保存模型
     def save(self, filename):
         data = {"sizes" : self.sizes,
-                "weights" : [w.tolist() for w in self.weights]
-                "biases" : [w.tolist() for b in self.biases]
+                "weights" : [w.tolist() for w in self.weights],
+                "biases" : [w.tolist() for b in self.biases],
                 "cost" : str(self.cost.__name__)
         }
         with open(filename, 'w') as f:
@@ -208,6 +230,11 @@ def load(filename):
 
     return net
 
+def vectorized_result(y):
+    e = np.zeros((10, 1))
+    e[y] = 1.0
+    return e
+
 # sigmoid 激励函数
 def sigmoid(z):
     return 1. / (1. + np.exp(-z))
@@ -218,11 +245,11 @@ def sigmoid_prime(z):
 
 def train_net():
     training_data, validation_data, test_data = mnist_load.load_data_wrapper()
-    net = Network([28*28, 30, 10])
-    net.SGD(training_data, 60, 10, 0.5, test_data=test_data)
+    net = Network([28*28, 60, 10])
+    net.SGD(training_data, 30, 10, 0.5, 5.0, test_data=test_data)
 
 if __name__ == '__main__':
     train_net()
-    plt.plot(list(range(60)), trained_res)
+    plt.plot(list(range(30)), trained_res)
     plt.show()
 
